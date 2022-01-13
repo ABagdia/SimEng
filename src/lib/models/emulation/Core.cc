@@ -119,7 +119,7 @@ void Core::tick() {
       execute(uop);
       return;
     }
-  } else if (uop->isStore()) {
+  } else if (uop->isStoreAddress()) {
     uop->generateAddresses();
   }
 
@@ -134,7 +134,7 @@ void Core::execute(std::shared_ptr<Instruction>& uop) {
     return;
   }
 
-  if (uop->isStore()) {
+  if (uop->isStoreData()) {
     auto addresses = uop->getGeneratedAddresses();
     auto data = uop->getData();
     for (size_t i = 0; i < addresses.size(); i++) {
