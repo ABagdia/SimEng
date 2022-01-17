@@ -16,6 +16,7 @@ Instruction::Instruction(const Architecture& architecture,
                          MicroOpInfo microOpInfo)
     : architecture_(architecture), metadata(metadata) {
   isMicroOp_ = microOpInfo.isMicroOp;
+  microOpcode_ = microOpInfo.microOpcode;
   isLastMicroOp_ = microOpInfo.isLastMicroOp;
   microOpIndex_ = microOpInfo.microOpIndex;
   decode();
@@ -120,7 +121,6 @@ bool Instruction::isLoad() const { return isLoad_; }
 bool Instruction::isBranch() const { return isBranch_; }
 bool Instruction::isRET() const { return isRET_; }
 bool Instruction::isBL() const { return isBL_; }
-bool Instruction::isSVE() const { return isSVEData_; }
 
 void Instruction::setMemoryAddresses(
     const std::vector<MemoryAccessTarget>& addresses) {
