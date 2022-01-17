@@ -204,6 +204,7 @@ void Core::flushIfNeeded() {
 
     // Flush everything younger than the bad instruction from the ROB
     reorderBuffer_.flush(lowestSeqId);
+    decodeUnit_.purgeFlushed();
     dispatchIssueUnit_.purgeFlushed();
     loadStoreQueue_.purgeFlushed();
     for (auto& eu : executionUnits_) {
@@ -219,6 +220,7 @@ void Core::flushIfNeeded() {
     fetchUnit_.updatePC(targetAddress);
     fetchToDecodeBuffer_.fill({});
     fetchToDecodeBuffer_.stall(false);
+    decodeUnit_.purgeFlushed();
 
     flushes_++;
   }
@@ -275,6 +277,7 @@ void Core::handleException() {
   // This must happen prior to handling the exception to ensure the commit state
   // is up-to-date with the register mapping table
   reorderBuffer_.flush(exceptionGeneratingInstruction_->getSequenceId());
+  decodeUnit_.purgeFlushed();
   dispatchIssueUnit_.purgeFlushed();
   loadStoreQueue_.purgeFlushed();
   for (auto& eu : executionUnits_) {
