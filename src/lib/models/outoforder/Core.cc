@@ -95,7 +95,8 @@ Core::Core(MemoryInterface& instructionMemory, MemoryInterface& dataMemory,
         [this](auto regs, auto values) {
           dispatchIssueUnit_.forwardOperands(regs, values);
         },
-        [this](auto uop) { loadStoreQueue_.startLoad(uop); }, [](auto uop) {},
+        [this](auto uop) { loadStoreQueue_.startLoad(uop); },
+        [this](auto uop) { loadStoreQueue_.supplyStoreData(uop); },
         [](auto uop) { uop->setCommitReady(); }, branchPredictor,
         config["Execution-Units"][i]["Pipelined"].as<bool>(), blockingGroups);
   }
