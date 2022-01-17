@@ -253,14 +253,22 @@ void Instruction::decode() {
       if (metadata.id == ARM64_INS_STXR || metadata.id == ARM64_INS_STLXR) {
         // Exceptions to this is load condition are exclusive store with a
         // success flag as first operand
-        isStoreAddress_ = true;
-        isStoreData_ = true;
+        if (microOpcode_ != MicroOpcode::STR_DATA) {
+          isStoreAddress_ = true;
+        }
+        if (microOpcode_ != MicroOpcode::STR_ADDR) {
+          isStoreData_ = true;
+        }
       } else {
         isLoad_ = true;
       }
     } else {
-      isStoreAddress_ = true;
-      isStoreData_ = true;
+      if (microOpcode_ != MicroOpcode::STR_DATA) {
+        isStoreAddress_ = true;
+      }
+      if (microOpcode_ != MicroOpcode::STR_ADDR) {
+        isStoreData_ = true;
+      }
     }
 
     // LDADD* are considered to be both a load and a store
@@ -280,12 +288,6 @@ void Instruction::decode() {
           metadata.operands[0].reg <= ARM64_REG_Z31) {
         isSVEData_ = true;
       }
-    }
-
-    if (metadata.id == ARM64_INS_LDP || metadata.id == ARM64_INS_STP) {
-      splitMemoryRequests_ = true;
-    } else if (metadata.opcode > 1958 && metadata.opcode < 1975) {
-      splitMemoryRequests_ = true;
     }
   }
   if (metadata.opcode == Opcode::AArch64_LDRXl ||
