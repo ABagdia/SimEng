@@ -226,10 +226,41 @@ void Instruction::execute() {
   if (microOpcode_ == MicroOpcode::LDR_ADDR) {
     for (size_t dest = 0; dest < getDestinationRegisters().size(); dest++) {
       results[dest] = memoryData[dest];
+      std::cout << "### LDR_DATA: " << getSequenceId() << ":"
+                << getInstructionId() << ":0x" << std::hex
+                << getInstructionAddress() << std::dec << ":"
+                << getMicroOpIndex() << " -> 0x" << std::hex
+                << results[dest].get<uint64_t>() << std::dec << std::endl;
     }
-  } else if (microOpcode_ == MicroOpcode::OFFSET_GEN) {
-    results[0] = operands[0].get<uint64_t>() +
-                 static_cast<uint64_t>(metadata.operands[2].imm);
+  } else if (microOpcode_ == MicroOpcode::OFFSET_IMM) {
+    results[0] = operands[0].get<uint64_t>() + metadata.operands[2].imm;
+    std::cout << "### OFF_IMM: " << getSequenceId() << ":" << getInstructionId()
+              << ":0x" << std::hex << getInstructionAddress() << std::dec << ":"
+              << getMicroOpIndex() << " -> 0x" << std::hex
+              << operands[0].get<uint64_t>() << std::dec << " + "
+              << metadata.operands[2].imm << " = 0x" << std::hex
+              << results[0].get<uint64_t>() << std::dec << std::endl;
+    // } else if (microOpcode_ == MicroOpcode::OFFSET_REG) {
+    //   results[0] =
+    //       operands[0].get<uint64_t>() +
+    //       extendOffset(operands[1].get<uint64_t>(), metadata.operands[2]);
+    //   std::cout << "### OFF_REG: " << getSequenceId() << ":" <<
+    //   getInstructionId()
+    //             << ":0x" << std::hex << getInstructionAddress() << std::dec
+    //             << ":"
+    //             << getMicroOpIndex() << " -> 0x" << std::hex
+    //             << operands[0].get<uint64_t>() << std::dec << " + ("
+    //             << operands[1].get<uint64_t>() << " << "
+    //             << metadata.operands[2].shift.value << ") = 0x" << std::hex
+    //             << results[0].get<uint64_t>() << std::dec << std::endl;
+  } else if (microOpcode_ == MicroOpcode::STR_DATA) {
+    setMemoryAddresses({{0,0}});
+    memoryData[0] = operands[0];
+    std::cout << "### STR_DATA: " << getSequenceId() << ":"
+              << getInstructionId() << ":0x" << std::hex
+              << getInstructionAddress() << std::dec << ":" << getMicroOpIndex()
+              << " -> " << memoryData[0].get<uint64_t>() << std::dec
+              << std::endl;
   } else {
     const uint16_t VL_bits = architecture_.getVectorLength();
     executed_ = true;
