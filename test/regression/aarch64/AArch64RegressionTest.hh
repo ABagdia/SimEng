@@ -15,7 +15,7 @@
    "L1-Cache: {Access-Latency: 4, Bandwidth: 32, "                             \
    "Permitted-Requests-Per-Cycle: 2, Permitted-Loads-Per-Cycle: 2, "           \
    "Permitted-Stores-Per-Cycle: 1}, Ports: {'0': {Portname: Port 0, "          \
-   "Instruction-Group-Support: [0, 12, 46, 58, 59, 60, 61]}}, "                \
+   "Instruction-Group-Support: [0, 13, 49, 62, 63, 64, 65, 66]}}, "            \
    "Reservation-Stations: {'0': {Size: 60, Ports: [0]}}, Execution-Units: "    \
    "{'0': {Pipelined: true}}}")
 
