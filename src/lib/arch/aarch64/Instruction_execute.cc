@@ -222,72 +222,71 @@ void Instruction::execute() {
   assert(
       canExecute() &&
       "Attempted to execute an instruction before all operands were provided");
-
-  if (microOpcode_ == MicroOpcode::LDR_ADDR) {
-    uint16_t regSize = (isScalarData_ || isVectorData_ || isSVEData_) ? 256 : 8;
-    for (size_t dest = 0; dest < getDestinationRegisters().size(); dest++) {
-      results[dest] = memoryData[dest].zeroExtend(dataSize_, regSize);
-      std::cout << "### LDR_DATA: " << getSequenceId() << ":"
-                << getInstructionId() << ":0x" << std::hex
-                << getInstructionAddress() << std::dec << ":"
-                << getMicroOpIndex() << " -> 0x" << std::hex;
-      if (results[dest].size() == 1)
-        std::cout << results[dest].get<uint8_t>();
-      else if (results[dest].size() == 2)
-        std::cout << results[dest].get<uint16_t>();
-      else if (results[dest].size() == 4)
-        std::cout << results[dest].get<uint32_t>();
-      else if (results[dest].size() == 8)
-        std::cout << results[dest].get<uint64_t>();
-      else if (results[dest].size() == 256)
-        std::cout << results[dest].getAsVector<uint64_t>()[0] << ":"
-                  << results[dest].getAsVector<uint64_t>()[1];
-      else
-        std::cout << "N/A";
-      std::cout << std::dec << std::endl;
+  executed_ = true;
+  if (isMicroOp_) {
+    switch (microOpcode_) {
+      case MicroOpcode::LDR_ADDR: {
+        uint16_t regSize =
+            (isScalarData_ || isVectorData_ || isSVEData_) ? 256 : 8;
+        for (size_t dest = 0; dest < getDestinationRegisters().size(); dest++) {
+          results[dest] = memoryData[dest].zeroExtend(dataSize_, regSize);
+          // std::cout << "### LDR_DATA: " << getSequenceId() << ":"
+          //           << getInstructionId() << ":0x" << std::hex
+          //           << getInstructionAddress() << std::dec << ":"
+          //           << getMicroOpIndex() << " -> 0x" << std::hex;
+          // if (results[dest].size() == 1)
+          //   std::cout << results[dest].get<uint8_t>();
+          // else if (results[dest].size() == 2)
+          //   std::cout << results[dest].get<uint16_t>();
+          // else if (results[dest].size() == 4)
+          //   std::cout << results[dest].get<uint32_t>();
+          // else if (results[dest].size() == 8)
+          //   std::cout << results[dest].get<uint64_t>();
+          // else if (results[dest].size() == 256)
+          //   std::cout << results[dest].getAsVector<uint64_t>()[0] << ":"
+          //             << results[dest].getAsVector<uint64_t>()[1];
+          // else
+          //   std::cout << "N/A";
+          // std::cout << std::dec << std::endl;
+        }
+        break;
+      }
+      case MicroOpcode::OFFSET_IMM: {
+        results[0] = operands[0].get<uint64_t>() + metadata.operands[2].imm;
+        // std::cout << "### OFF_IMM: " << getSequenceId() << ":"
+        //           << getInstructionId() << ":0x" << std::hex
+        //           << getInstructionAddress() << std::dec << ":"
+        //           << getMicroOpIndex() << " -> 0x" << std::hex
+        //           << operands[0].get<uint64_t>() << std::dec << " + "
+        //           << metadata.operands[2].imm << " = 0x" << std::hex
+        //           << results[0].get<uint64_t>() << std::dec << std::endl;
+        break;
+      }
+      case MicroOpcode::STR_DATA: {
+        setMemoryAddresses({{0, 0}});
+        memoryData[0] = operands[0];
+        // std::cout << "### STR_DATA: " << getSequenceId() << ":"
+        //           << getInstructionId() << ":0x" << std::hex
+        //           << getInstructionAddress() << std::dec << ":"
+        //           << getMicroOpIndex() << " -> " << std::hex;
+        // if (memoryData[0].size() == 1)
+        //   std::cout << memoryData[0].get<uint8_t>();
+        // else if (memoryData[0].size() == 2)
+        //   std::cout << memoryData[0].get<uint16_t>();
+        // else if (memoryData[0].size() == 4)
+        //   std::cout << memoryData[0].get<uint32_t>();
+        // else if (memoryData[0].size() == 8)
+        //   std::cout << memoryData[0].get<uint64_t>();
+        // else
+        //   std::cout << "N/A";
+        // std::cout << std::dec << std::endl;
+        break;
+      }
+      default:
+        return executionNYI();
     }
-  } else if (microOpcode_ == MicroOpcode::OFFSET_IMM) {
-    results[0] = operands[0].get<uint64_t>() + metadata.operands[2].imm;
-    std::cout << "### OFF_IMM: " << getSequenceId() << ":" << getInstructionId()
-              << ":0x" << std::hex << getInstructionAddress() << std::dec << ":"
-              << getMicroOpIndex() << " -> 0x" << std::hex
-              << operands[0].get<uint64_t>() << std::dec << " + "
-              << metadata.operands[2].imm << " = 0x" << std::hex
-              << results[0].get<uint64_t>() << std::dec << std::endl;
-    // } else if (microOpcode_ == MicroOpcode::OFFSET_REG) {
-    //   results[0] =
-    //       operands[0].get<uint64_t>() +
-    //       extendOffset(operands[1].get<uint64_t>(), metadata.operands[2]);
-    //   std::cout << "### OFF_REG: " << getSequenceId() << ":" <<
-    //   getInstructionId()
-    //             << ":0x" << std::hex << getInstructionAddress() << std::dec
-    //             << ":"
-    //             << getMicroOpIndex() << " -> 0x" << std::hex
-    //             << operands[0].get<uint64_t>() << std::dec << " + ("
-    //             << operands[1].get<uint64_t>() << " << "
-    //             << metadata.operands[2].shift.value << ") = 0x" << std::hex
-    //             << results[0].get<uint64_t>() << std::dec << std::endl;
-  } else if (microOpcode_ == MicroOpcode::STR_DATA) {
-    setMemoryAddresses({{0, 0}});
-    memoryData[0] = operands[0];
-    std::cout << "### STR_DATA: " << getSequenceId() << ":"
-              << getInstructionId() << ":0x" << std::hex
-              << getInstructionAddress() << std::dec << ":" << getMicroOpIndex()
-              << " -> " << std::hex;
-    if (memoryData[0].size() == 1)
-      std::cout << memoryData[0].get<uint8_t>();
-    else if (memoryData[0].size() == 2)
-      std::cout << memoryData[0].get<uint16_t>();
-    else if (memoryData[0].size() == 4)
-      std::cout << memoryData[0].get<uint32_t>();
-    else if (memoryData[0].size() == 8)
-      std::cout << memoryData[0].get<uint64_t>();
-    else
-      std::cout << "N/A";
-    std::cout << std::dec << std::endl;
   } else {
     const uint16_t VL_bits = architecture_.getVectorLength();
-    executed_ = true;
     switch (metadata.opcode) {
       case Opcode::AArch64_ADDv16i8: {  // add vd.16b, vn.16b, vm.16b
         const uint8_t* n = operands[0].getAsVector<uint8_t>();
@@ -4919,38 +4918,38 @@ void Instruction::execute() {
         results[1] = memoryData[1].zeroExtend(4, 256);
         break;
       }
-      case Opcode::AArch64_LDPDi: {  // ldp dt1, dt2, [xn, #imm]
-        results[0] = memoryData[0].zeroExtend(8, 256);
-        results[1] = memoryData[1].zeroExtend(8, 256);
+      case Opcode::AArch64_LDPDi:    // ldp dt1, dt2, [xn, #imm]
+      case Opcode::AArch64_LDPQi:    // ldp qt1, qt2, [xn, #imm]
+      case Opcode::AArch64_LDPSi:    // ldp st1, st2, [xn, #imm]
+      case Opcode::AArch64_LDPWi:    // ldp wt1, wt2, [xn, #imm]
+      case Opcode::AArch64_LDPXi: {  // ldp xt1, xt2, [xn, #imm]
+        uint16_t regSize =
+            (isScalarData_ || isVectorData_ || isSVEData_) ? 256 : 8;
+        results[0] = memoryData[0].zeroExtend(dataSize_, regSize);
+        results[1] = memoryData[1].zeroExtend(dataSize_, regSize);
         break;
       }
-      case Opcode::AArch64_LDPDpost: {  // ldp dt1, dt2, [xn], #imm
-        results[0] = memoryData[0].zeroExtend(8, 256);
-        results[1] = memoryData[1].zeroExtend(8, 256);
+      case Opcode::AArch64_LDPDpost:    // ldp dt1, dt2, [xn], #imm
+      case Opcode::AArch64_LDPQpost:    // ldp qt1, qt2, [xn], #imm
+      case Opcode::AArch64_LDPSpost:    // ldp st1, st2, [xn], #imm
+      case Opcode::AArch64_LDPWpost:    // ldp wt1, wt2, [xn], #imm
+      case Opcode::AArch64_LDPXpost: {  // ldp xt1, xt2, [xn], #imm
+        uint16_t regSize =
+            (isScalarData_ || isVectorData_ || isSVEData_) ? 256 : 8;
+        results[0] = memoryData[0].zeroExtend(dataSize_, regSize);
+        results[1] = memoryData[1].zeroExtend(dataSize_, regSize);
         results[2] = operands[0].get<uint64_t>() + metadata.operands[3].imm;
         break;
       }
-      case Opcode::AArch64_LDPDpre: {  // ldp dt1, dt2, [xn, #imm]
-        results[0] = memoryData[0].zeroExtend(8, 256);
-        results[1] = memoryData[1].zeroExtend(8, 256);
-        results[2] =
-            operands[0].get<uint64_t>() + metadata.operands[2].mem.disp;
-        break;
-      }
-      case Opcode::AArch64_LDPQi: {  // ldp qt1, qt2, [xn, #imm]
-        results[0] = memoryData[0].zeroExtend(16, 256);
-        results[1] = memoryData[1].zeroExtend(16, 256);
-        break;
-      }
-      case Opcode::AArch64_LDPQpost: {  // ldp qt1, qt2, [xn], #imm
-        results[0] = memoryData[0].zeroExtend(16, 256);
-        results[1] = memoryData[1].zeroExtend(16, 256);
-        results[2] = operands[0].get<uint64_t>() + metadata.operands[3].imm;
-        break;
-      }
-      case Opcode::AArch64_LDPQpre: {  // ldp qt1, qt2, [xn, #imm]
-        results[0] = memoryData[0].zeroExtend(16, 256);
-        results[1] = memoryData[1].zeroExtend(16, 256);
+      case Opcode::AArch64_LDPDpre:    // ldp dt1, dt2, [xn, #imm]!
+      case Opcode::AArch64_LDPQpre:    // ldp qt1, qt2, [xn, #imm]!
+      case Opcode::AArch64_LDPSpre:    // ldp st1, st2, [xn, #imm]!
+      case Opcode::AArch64_LDPWpre:    // ldp wt1, wt2, [xn, #imm]!
+      case Opcode::AArch64_LDPXpre: {  // ldp xt1, xt2, [xn, #imm]!
+        uint16_t regSize =
+            (isScalarData_ || isVectorData_ || isSVEData_) ? 256 : 8;
+        results[0] = memoryData[0].zeroExtend(dataSize_, regSize);
+        results[1] = memoryData[1].zeroExtend(dataSize_, regSize);
         results[2] =
             operands[0].get<uint64_t>() + metadata.operands[2].mem.disp;
         break;
@@ -4958,34 +4957,6 @@ void Instruction::execute() {
       case Opcode::AArch64_LDPSWi: {  // ldpsw xt1, xt2, [xn {, #imm}]
         results[0] = memoryData[0].zeroExtend(4, 8);
         results[1] = memoryData[1].zeroExtend(4, 8);
-        break;
-      }
-      case Opcode::AArch64_LDPSi: {  // ldp st1, st2, [xn, #imm]
-        results[0] = memoryData[0].zeroExtend(4, 256);
-        results[1] = memoryData[1].zeroExtend(4, 256);
-        break;
-      }
-      case Opcode::AArch64_LDPWi: {  // ldp wt1, wt2, [xn, #imm]
-        results[0] = memoryData[0].zeroExtend(4, 8);
-        results[1] = memoryData[1].zeroExtend(4, 8);
-        break;
-      }
-      case Opcode::AArch64_LDPXi: {  // ldp xt1, xt2, [xn, #imm]
-        results[0] = memoryData[0];
-        results[1] = memoryData[1];
-        break;
-      }
-      case Opcode::AArch64_LDPXpost: {  // ldp xt1, xt2, [xn], #imm
-        results[0] = memoryData[0];
-        results[1] = memoryData[1];
-        results[2] = operands[0].get<uint64_t>() + metadata.operands[3].imm;
-        break;
-      }
-      case Opcode::AArch64_LDPXpre: {  // ldp xt1, xt2, [xn, #imm]!
-        results[0] = memoryData[0];
-        results[1] = memoryData[1];
-        results[2] =
-            operands[0].get<uint64_t>() + metadata.operands[2].mem.disp;
         break;
       }
       case Opcode::AArch64_LDRBBpost: {  // ldrb wt, [xn], #imm
@@ -5013,17 +4984,6 @@ void Instruction::execute() {
         results[0] = memoryData[0].zeroExtend(1, 8);
         break;
       }
-      case Opcode::AArch64_LDRDpost: {  // ldr dt, [xn], #imm
-        results[0] = memoryData[0].zeroExtend(memoryAddresses[0].size, 256);
-        results[1] = operands[0].get<uint64_t>() + metadata.operands[2].imm;
-        break;
-      }
-      case Opcode::AArch64_LDRDpre: {  // ldr dt, [xn, #imm]!
-        results[0] = memoryData[0].zeroExtend(memoryAddresses[0].size, 256);
-        results[1] =
-            operands[0].get<uint64_t>() + metadata.operands[1].mem.disp;
-        break;
-      }
       case Opcode::AArch64_LDRDroW: {  // ldr dt, [xn, wm, {extend {#amount}}]
         results[0] = memoryData[0].zeroExtend(memoryAddresses[0].size, 256);
         break;
@@ -5032,8 +4992,43 @@ void Instruction::execute() {
         results[0] = memoryData[0].zeroExtend(memoryAddresses[0].size, 256);
         break;
       }
-      case Opcode::AArch64_LDRDui: {  // ldr dt, [xn, #imm]
-        results[0] = memoryData[0].zeroExtend(8, 256);
+      case Opcode::AArch64_LDRBui:    // ldr bt, [xn, #imm]
+      case Opcode::AArch64_LDRDui:    // ldr dt, [xn, #imm]
+      case Opcode::AArch64_LDRHui:    // ldr ht, [xn, #imm]
+      case Opcode::AArch64_LDRQui:    // ldr qt, [xn, #imm]
+      case Opcode::AArch64_LDRSui:    // ldr st, [xn, #imm]
+      case Opcode::AArch64_LDRWui:    // ldr wt, [xn, #imm]
+      case Opcode::AArch64_LDRXui: {  // ldr xt, [xn, #imm]
+        uint16_t regSize =
+            (isScalarData_ || isVectorData_ || isSVEData_) ? 256 : 8;
+        results[0] = memoryData[0].zeroExtend(dataSize_, regSize);
+        break;
+      }
+      case Opcode::AArch64_LDRBpost:    // ldr bt, [xn], #imm
+      case Opcode::AArch64_LDRDpost:    // ldr dt, [xn], #imm
+      case Opcode::AArch64_LDRHpost:    // ldr ht, [xn], #imm
+      case Opcode::AArch64_LDRQpost:    // ldr qt, [xn], #imm
+      case Opcode::AArch64_LDRSpost:    // ldr st, [xn], #imm
+      case Opcode::AArch64_LDRWpost:    // ldr wt, [xn], #imm
+      case Opcode::AArch64_LDRXpost: {  // ldr xt, [xn], #imm
+        uint16_t regSize =
+            (isScalarData_ || isVectorData_ || isSVEData_) ? 256 : 8;
+        results[0] = memoryData[0].zeroExtend(dataSize_, regSize);
+        results[1] = operands[0].get<uint64_t>() + metadata.operands[2].imm;
+        break;
+      }
+      case Opcode::AArch64_LDRBpre:    // ldr bt, [xn, #imm]!
+      case Opcode::AArch64_LDRDpre:    // ldr dt, [xn, #imm]!
+      case Opcode::AArch64_LDRHpre:    // ldr ht, [xn, #imm]!
+      case Opcode::AArch64_LDRQpre:    // ldr qt, [xn, #imm]!
+      case Opcode::AArch64_LDRSpre:    // ldr st, [xn, #imm]!
+      case Opcode::AArch64_LDRWpre:    // ldr wt, [xn, #imm]!
+      case Opcode::AArch64_LDRXpre: {  // ldr xt, [xn, #imm]!
+        uint16_t regSize =
+            (isScalarData_ || isVectorData_ || isSVEData_) ? 256 : 8;
+        results[0] = memoryData[0].zeroExtend(dataSize_, regSize);
+        results[1] =
+            operands[0].get<uint64_t>() + metadata.operands[1].mem.disp;
         break;
       }
       case Opcode::AArch64_LDRHHpost: {  // ldrh wt, [xn], #imm
@@ -5059,16 +5054,7 @@ void Instruction::execute() {
         results[0] = memoryData[0].zeroExtend(2, 8);
         break;
       }
-      case Opcode::AArch64_LDRQpost: {  // ldr qt, [xn], #imm
-        results[0] = memoryData[0].zeroExtend(16, 256);
-        results[1] = operands[0].get<uint64_t>() + metadata.operands[2].imm;
-        break;
-      }
       case Opcode::AArch64_LDRQroX: {  // ldr qt, [xn, xm, {extend {#amount}}]
-        results[0] = memoryData[0].zeroExtend(16, 256);
-        break;
-      }
-      case Opcode::AArch64_LDRQui: {  // ldr qt, [xn, #imm]
         results[0] = memoryData[0].zeroExtend(16, 256);
         break;
       }
@@ -5137,17 +5123,6 @@ void Instruction::execute() {
         results[0] = static_cast<int64_t>(memoryData[0].get<int32_t>());
         break;
       }
-      case Opcode::AArch64_LDRSpost: {  // ldr st, [xn], #imm
-        results[0] = memoryData[0].zeroExtend(4, 256);
-        results[1] = operands[0].get<uint64_t>() + metadata.operands[2].imm;
-        break;
-      }
-      case Opcode::AArch64_LDRSpre: {  // ldr st, [xn, #imm]!
-        results[0] = memoryData[0].zeroExtend(4, 256);
-        results[1] =
-            operands[0].get<uint64_t>() + metadata.operands[1].mem.disp;
-        break;
-      }
       case Opcode::AArch64_LDRSroW: {  // ldr st, [xn, wm, {extend {#amount}}]
         results[0] = memoryData[0].zeroExtend(4, 256);
         break;
@@ -5156,23 +5131,8 @@ void Instruction::execute() {
         results[0] = memoryData[0].zeroExtend(4, 256);
         break;
       }
-      case Opcode::AArch64_LDRSui: {  // ldr st, [xn, #imm]
-        results[0] = memoryData[0].zeroExtend(4, 256);
-        break;
-      }
       case Opcode::AArch64_LDRSWl: {  // ldrsw xt, #imm
         results[0] = memoryData[0].zeroExtend(4, 8);
-        break;
-      }
-      case Opcode::AArch64_LDRWpost: {  // ldr wt, [xn], #imm
-        results[0] = memoryData[0].zeroExtend(4, 8);
-        results[1] = operands[0].get<uint64_t>() + metadata.operands[2].imm;
-        break;
-      }
-      case Opcode::AArch64_LDRWpre: {  // ldr wt, [xn, #imm]!
-        results[0] = memoryData[0].zeroExtend(4, 8);
-        results[1] =
-            operands[0].get<uint64_t>() + metadata.operands[1].mem.disp;
         break;
       }
       case Opcode::AArch64_LDRWroW: {  // ldr wt, [xn, wm, {extend {#amount}}]
@@ -5183,23 +5143,8 @@ void Instruction::execute() {
         results[0] = memoryData[0].zeroExtend(4, 8);
         break;
       }
-      case Opcode::AArch64_LDRWui: {  // ldr wt, [xn, #imm]
-        results[0] = memoryData[0].zeroExtend(memoryAddresses[0].size, 8);
-        break;
-      }
       case Opcode::AArch64_LDRXl: {  // ldr xt, #imm
         results[0] = memoryData[0];
-        break;
-      }
-      case Opcode::AArch64_LDRXpost: {  // ldr xt, [xn], #imm
-        results[0] = memoryData[0];
-        results[1] = operands[0].get<uint64_t>() + metadata.operands[2].imm;
-        break;
-      }
-      case Opcode::AArch64_LDRXpre: {  // ldr xt, [xn, #imm]!
-        results[0] = memoryData[0];
-        results[1] =
-            operands[0].get<uint64_t>() + metadata.operands[1].mem.disp;
         break;
       }
       case Opcode::AArch64_LDRXroW: {  // ldr xt, [xn, wn{, extend {#amount}}]
@@ -5207,10 +5152,6 @@ void Instruction::execute() {
         break;
       }
       case Opcode::AArch64_LDRXroX: {  // ldr xt, [xn, xn{, extend {#amount}}]
-        results[0] = memoryData[0];
-        break;
-      }
-      case Opcode::AArch64_LDRXui: {  // ldr xt, [xn, #imm]
         results[0] = memoryData[0];
         break;
       }
@@ -6759,81 +6700,34 @@ void Instruction::execute() {
         results[0] = static_cast<uint64_t>(0);
         break;
       }
-      case Opcode::AArch64_STPDi: {  // stp dt1, dt2, [xn, #imm]
+      case Opcode::AArch64_STPDi:    // stp dt1, dt2, [xn, #imm]
+      case Opcode::AArch64_STPQi:    // stp qt1, qt2, [xn, #imm]
+      case Opcode::AArch64_STPSi:    // stp st1, st2, [xn, #imm]
+      case Opcode::AArch64_STPWi:    // stp wt1, wt2, [xn, #imm]
+      case Opcode::AArch64_STPXi: {  // stp xt1, xt2, [xn, #imm]
         memoryData[0] = operands[0];
         memoryData[1] = operands[1];
         break;
       }
-      case Opcode::AArch64_STPDpost: {  // stp dt1, dt2, [xn], #imm
-        memoryData[0] = operands[0];
-        memoryData[1] = operands[1];
-        results[0] = operands[2].get<uint64_t>() + metadata.operands[3].imm;
-        break;
-      }
-      case Opcode::AArch64_STPDpre: {  // stp dt1, dt2, [xn, #imm]!
-        memoryData[0] = operands[0];
-        memoryData[1] = operands[1];
-        results[0] =
-            operands[2].get<uint64_t>() + metadata.operands[2].mem.disp;
-        break;
-      }
-      case Opcode::AArch64_STPSi: {  // stp st1, st2, [xn, #imm]
-        memoryData[0] = operands[0];
-        memoryData[1] = operands[1];
-        break;
-      }
-      case Opcode::AArch64_STPSpost: {  // stp st1, st2, [xn], #imm
-        memoryData[0] = operands[0];
-        memoryData[1] = operands[1];
-        results[0] = operands[2].get<uint64_t>() + metadata.operands[3].imm;
-        break;
-      }
-      case Opcode::AArch64_STPSpre: {  // stp st1, st2, [xn, #imm]!
-        memoryData[0] = operands[0];
-        memoryData[1] = operands[1];
-        results[0] =
-            operands[2].get<uint64_t>() + metadata.operands[2].mem.disp;
-        break;
-      }
-      case Opcode::AArch64_STPXpre: {  // stp xt1, xt2, [xn, #imm]!
-        memoryData[0] = operands[0];
-        memoryData[1] = operands[1];
-        results[0] =
-            operands[2].get<uint64_t>() + metadata.operands[2].mem.disp;
-        break;
-      }
+      case Opcode::AArch64_STPDpost:    // stp dt1, dt2, [xn], #imm
+      case Opcode::AArch64_STPQpost:    // stp qt1, qt2, [xn], #imm
+      case Opcode::AArch64_STPSpost:    // stp st1, st2, [xn], #imm
+      case Opcode::AArch64_STPWpost:    // stp wt1, wt2, [xn], #imm
       case Opcode::AArch64_STPXpost: {  // stp xt1, xt2, [xn], #imm
         memoryData[0] = operands[0];
         memoryData[1] = operands[1];
         results[0] = operands[2].get<uint64_t>() + metadata.operands[3].imm;
         break;
       }
-      case Opcode::AArch64_STPXi: {  // stp xt1, xt2, [xn, #imm]
-        memoryData[0] = operands[0];
-        memoryData[1] = operands[1];
-        break;
-      }
-      case Opcode::AArch64_STPQi: {  // stp qt1, qt2, [xn, #imm]
-        memoryData[0] = operands[0];
-        memoryData[1] = operands[1];
-        break;
-      }
-      case Opcode::AArch64_STPQpre: {  // stp qt1, qt2, [xn, #imm]!
+      case Opcode::AArch64_STPDpre:    // stp dt1, dt2, [xn, #imm]!
+      case Opcode::AArch64_STPQpre:    // stp qt1, qt2, [xn, #imm]!
+      case Opcode::AArch64_STPSpre:    // stp st1, st2, [xn, #imm]!
+      case Opcode::AArch64_STPWpre:    // stp wt1, wt2, [xn, #imm]!
+      case Opcode::AArch64_STPXpre: {  // stp xt1, xt2, [xn, #imm]!
         memoryData[0] = operands[0];
         memoryData[1] = operands[1];
         results[0] =
             operands[2].get<uint64_t>() + metadata.operands[2].mem.disp;
-        break;
-      }
-      case Opcode::AArch64_STPQpost: {  // stp qt1, qt2, [xn], #imm
-        memoryData[0] = operands[0];
-        memoryData[1] = operands[1];
-        results[0] = operands[2].get<uint64_t>() + metadata.operands[3].imm;
-        break;
-      }
-      case Opcode::AArch64_STPWi: {  // stp wt1, wt2, [xn, #imm]
-        memoryData[0] = operands[0];
-        memoryData[1] = operands[1];
         break;
       }
       case Opcode::AArch64_STRBBpost: {  // strb wd, [xn], #imm
@@ -6861,17 +6755,6 @@ void Instruction::execute() {
         memoryData[0] = operands[0];
         break;
       }
-      case Opcode::AArch64_STRDpost: {  // str dt, [xn], #imm
-        memoryData[0] = operands[0];
-        results[0] = operands[1].get<uint64_t>() + metadata.operands[2].imm;
-        break;
-      }
-      case Opcode::AArch64_STRDpre: {  // str dd, [xn, #imm]!
-        memoryData[0] = operands[0];
-        results[0] =
-            operands[1].get<uint64_t>() + metadata.operands[1].mem.disp;
-        break;
-      }
       case Opcode::AArch64_STRDroW: {  // str dt, [xn, wm{, #extend {#amount}}]
         memoryData[0] = operands[0];
         break;
@@ -6880,8 +6763,37 @@ void Instruction::execute() {
         memoryData[0] = operands[0];
         break;
       }
-      case Opcode::AArch64_STRDui: {  // str dt, [xn, #imm]
+      case Opcode::AArch64_STRBui:    // str bt, [xn, #imm]
+      case Opcode::AArch64_STRDui:    // str dt, [xn, #imm]
+      case Opcode::AArch64_STRHui:    // str ht, [xn, #imm]
+      case Opcode::AArch64_STRQui:    // str qt, [xn, #imm]
+      case Opcode::AArch64_STRSui:    // str st, [xn, #imm]
+      case Opcode::AArch64_STRWui:    // str wt, [xn, #imm]
+      case Opcode::AArch64_STRXui: {  // str xt, [xn, #imm]
         memoryData[0] = operands[0];
+        break;
+      }
+      case Opcode::AArch64_STRBpost:    // str bt, [xn], #imm
+      case Opcode::AArch64_STRDpost:    // str dt, [xn], #imm
+      case Opcode::AArch64_STRHpost:    // str ht, [xn], #imm
+      case Opcode::AArch64_STRQpost:    // str qt, [xn], #imm
+      case Opcode::AArch64_STRSpost:    // str st, [xn], #imm
+      case Opcode::AArch64_STRWpost:    // str wt, [xn], #imm
+      case Opcode::AArch64_STRXpost: {  // str xt, [xn], #imm
+        memoryData[0] = operands[0];
+        results[0] = operands[1].get<uint64_t>() + metadata.operands[2].imm;
+        break;
+      }
+      case Opcode::AArch64_STRBpre:    // str bt, [xn, #imm]!
+      case Opcode::AArch64_STRDpre:    // str dt, [xn, #imm]!
+      case Opcode::AArch64_STRHpre:    // str ht, [xn, #imm]!
+      case Opcode::AArch64_STRQpre:    // str qt, [xn, #imm]!
+      case Opcode::AArch64_STRSpre:    // str st, [xn, #imm]!
+      case Opcode::AArch64_STRWpre:    // str wt, [xn, #imm]!
+      case Opcode::AArch64_STRXpre: {  // str xt, [xn, #imm]!
+        memoryData[0] = operands[0];
+        results[0] =
+            operands[1].get<uint64_t>() + metadata.operands[1].mem.disp;
         break;
       }
       case Opcode::AArch64_STRHHpost: {  // strh wt, [xn], #imm
@@ -6909,34 +6821,8 @@ void Instruction::execute() {
         memoryData[0] = operands[0];
         break;
       }
-      case Opcode::AArch64_STRQpost: {  // str qt, [xn], #imm
-        memoryData[0] = operands[0];
-        results[0] = operands[1].get<uint64_t>() + metadata.operands[2].imm;
-        break;
-      }
-      case Opcode::AArch64_STRQpre: {  // str qt, [xn, #imm]!
-        memoryData[0] = operands[0];
-        results[0] =
-            operands[1].get<uint64_t>() + metadata.operands[1].mem.disp;
-        break;
-      }
       case Opcode::AArch64_STRQroX: {  // str qt, [xn, xm{, extend, {#amount}}]
         memoryData[0] = operands[0];
-        break;
-      }
-      case Opcode::AArch64_STRQui: {  // str qt, [xn, #imm]
-        memoryData[0] = operands[0];
-        break;
-      }
-      case Opcode::AArch64_STRSpost: {  // str st, [xn], #imm
-        memoryData[0] = operands[0];
-        results[0] = operands[1].get<uint64_t>() + metadata.operands[2].imm;
-        break;
-      }
-      case Opcode::AArch64_STRSpre: {  // str sd, [xn, #imm]!
-        memoryData[0] = operands[0];
-        results[0] =
-            operands[1].get<uint64_t>() + metadata.operands[1].mem.disp;
         break;
       }
       case Opcode::AArch64_STRSroW: {  // str st, [xn, wm{, #extend {#amount}}]
@@ -6947,21 +6833,6 @@ void Instruction::execute() {
         memoryData[0] = operands[0];
         break;
       }
-      case Opcode::AArch64_STRSui: {  // str st, [xn, #imm]
-        memoryData[0] = operands[0];
-        break;
-      }
-      case Opcode::AArch64_STRWpost: {  // str wt, [xn], #imm
-        memoryData[0] = operands[0];
-        results[0] = operands[1].get<uint64_t>() + metadata.operands[2].imm;
-        break;
-      }
-      case Opcode::AArch64_STRWpre: {  // str wd, [xn, #imm]!
-        memoryData[0] = operands[0];
-        results[0] =
-            operands[1].get<uint64_t>() + metadata.operands[1].mem.disp;
-        break;
-      }
       case Opcode::AArch64_STRWroW: {  // str wd, [xn, wm{, extend {#amount}}]
         memoryData[0] = operands[0];
         break;
@@ -6970,30 +6841,11 @@ void Instruction::execute() {
         memoryData[0] = operands[0];
         break;
       }
-      case Opcode::AArch64_STRWui: {  // str wt, [xn, #imm]
-        memoryData[0] = operands[0];
-        break;
-      }
-      case Opcode::AArch64_STRXpost: {  // str xt, [xn], #imm
-        memoryData[0] = operands[0];
-        results[0] = operands[1].get<uint64_t>() + metadata.operands[2].imm;
-        break;
-      }
-      case Opcode::AArch64_STRXpre: {  // str xd, [xn, #imm]!
-        memoryData[0] = operands[0];
-        results[0] =
-            operands[1].get<uint64_t>() + metadata.operands[1].mem.disp;
-        break;
-      }
       case Opcode::AArch64_STRXroW: {  // str xd, [xn, wm{, extend {#amount}}]
         memoryData[0] = operands[0];
         break;
       }
       case Opcode::AArch64_STRXroX: {  // str xt, [xn, xm{, extend, {#amount}}]
-        memoryData[0] = operands[0];
-        break;
-      }
-      case Opcode::AArch64_STRXui: {  // str xt, [xn, #imm]
         memoryData[0] = operands[0];
         break;
       }
