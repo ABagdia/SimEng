@@ -127,16 +127,21 @@ void LoadStoreQueue::supplyStoreData(const std::shared_ptr<Instruction>& insn) {
         entry->getMicroOpIndex() == microOpNum) {
       // Supply data to be stored by operations
       itSt->second = data;
-      std::cout << "\tsupplyStoreData: " << itSt->first->getSequenceId() << ":"
-                << itSt->first->getInstructionId() << ":0x" << std::hex
-                << itSt->first->getInstructionAddress() << std::dec << ":"
-                << itSt->first->getMicroOpIndex() << ":" << std::endl;
-      for (auto d : data) {
-        if (d.size() == 4)
-          std::cout << "\t\t" << d.get<uint32_t>() << std::endl;
-        else if (d.size() == 8)
-          std::cout << "\t\t" << d.get<uint64_t>() << std::endl;
-      }
+      // std::cout << "\tsupplyStoreData: " << itSt->first->getSequenceId() <<
+      // ":"
+      //           << itSt->first->getInstructionId() << ":0x" << std::hex
+      //           << itSt->first->getInstructionAddress() << std::dec << ":"
+      //           << itSt->first->getMicroOpIndex() << " -> "
+      //           << insn->getSequenceId() << ":" << insn->getInstructionId()
+      //           << ":0x" << std::hex << insn->getInstructionAddress()
+      //           << std::dec << ":" << insn->getMicroOpIndex() << ":"
+      //           << std::endl;
+      // for (auto d : itSt->second) {
+      //   if (d.size() == 4)
+      //     std::cout << "\t\t" << d.get<uint32_t>() << std::endl;
+      //   else if (d.size() == 8)
+      //     std::cout << "\t\t" << d.get<uint64_t>() << std::endl;
+      // }
       break;
     } else {
       itSt++;
@@ -154,31 +159,32 @@ bool LoadStoreQueue::commitStore(const std::shared_ptr<Instruction>& uop) {
   const auto& addresses = uop->getGeneratedAddresses();
 
   const uint64_t microOpNum = uop->getSequenceId();
-  span<const simeng::RegisterValue> data;
-  auto itSt = storeQueue_.begin();
-  while (itSt != storeQueue_.end()) {
-    auto& entry = itSt->first;
-    if (entry->getSequenceId() == microOpNum) {
-      data = itSt->second;
-      break;
-    } else {
-      itSt++;
-    }
-  }
+  span<const simeng::RegisterValue> data = storeQueue_.front().second;
 
   requestQueue_.push_back({tickCounter_ + uop->getLSQLatency(), {}, uop});
   // Submit request write to memory interface early as the architectural state
   // considers the store to be retired and thus its operation complete
   for (size_t i = 0; i < addresses.size(); i++) {
-    std::cout << "commitStore: " << itSt->first->getSequenceId() << ":"
-              << itSt->first->getInstructionId() << ":0x" << std::hex
-              << itSt->first->getInstructionAddress() << std::dec << ":"
-              << itSt->first->getMicroOpIndex() << ":0x" << std::hex
-              << addresses[i].address << std::dec << " <- ";
-    if (data[i].size() == 4)
-      std::cout << data[i].get<uint32_t>() << std::endl;
-    else if (data[i].size() == 8)
-      std::cout << data[i].get<uint64_t>() << std::endl;
+    // std::cout << "\tStore: " << uop->getSequenceId() << ":"
+    //           << uop->getInstructionId() << ":0x" << std::hex
+    //           << uop->getInstructionAddress() << std::dec << ":0x" <<
+    //           std::hex
+    //           << addresses[i].address << std::dec << ":"
+    //           << uop->getMicroOpIndex() << " <- ";
+    // if (data[i].size() == 1)
+    //   std::cout << unsigned(data[i].get<uint8_t>());
+    // else if (data[i].size() == 2)
+    //   std::cout << data[i].get<uint16_t>();
+    // else if (data[i].size() == 4)
+    //   std::cout << data[i].get<uint32_t>();
+    // else if (data[i].size() == 8)
+    //   std::cout << data[i].get<uint64_t>();
+    // else if (data[i].size() == 256)
+    //   std::cout << data[i].getAsVector<uint64_t>()[0] << ":"
+    //             << data[i].getAsVector<uint64_t>()[1];
+    // else
+    //   std::cout << "N/A";
+    // std::cout << std::endl;
     memory_.requestWrite(addresses[i], data[i]);
     // Still add addresses to requestQueue_ to ensure contention of resources is
     // correctly simulated
@@ -250,6 +256,11 @@ void LoadStoreQueue::purgeFlushed() {
   while (itSt != storeQueue_.end()) {
     auto& entry = itSt->first;
     if (entry->isFlushed()) {
+      // std::cout << "\tErasing from storeQueue_: "
+      //           << itSt->first->getSequenceId() << ":"
+      //           << itSt->first->getInstructionId() << ":0x" << std::hex
+      //           << itSt->first->getInstructionAddress() << std::dec << ":"
+      //           << itSt->first->getMicroOpIndex() << ":" << std::endl;
       itSt = storeQueue_.erase(itSt);
     } else {
       itSt++;
@@ -273,6 +284,7 @@ void LoadStoreQueue::tick() {
   // requests per cycle
   uint64_t dataTransfered = 0;
   std::array<uint8_t, 2> reqCounts = {0, 0};
+  bool remove = true;
   while (requestQueue_.size() > 0) {
     uint8_t isWrite = 0;
     auto& entry = requestQueue_.front();
@@ -296,21 +308,24 @@ void LoadStoreQueue::tick() {
                "bandwidth set and thus will never be submitted");
         dataTransfered += req.size;
         if (dataTransfered >= L1Bandwidth_) {
+          remove = false;
           break;
         }
         // Request a read from the memory interface if the requestQueue_ entry
         // represents a read
-        std::cout << "req: " << entry.insn->getSequenceId() << ":"
-                  << entry.insn->getInstructionId() << ":0x" << std::hex
-                  << entry.insn->getInstructionAddress() << std::dec << ":"
-                  << entry.insn->getMicroOpIndex() << ":0x" << std::hex
-                  << req.address << std::dec << std::endl;
+        // std::cout << "req: " << entry.insn->getSequenceId() << ":"
+        //           << entry.insn->getInstructionId() << ":0x" << std::hex
+        //           << entry.insn->getInstructionAddress() << std::dec << ":"
+        //           << entry.insn->getMicroOpIndex() << ":0x" << std::hex
+        //           << req.address << std::dec << std::endl;
         if (!isWrite) {
           memory_.requestRead(req, entry.insn->getSequenceId());
         }
         addressQueue.pop();
       }
-      requestQueue_.pop_front();
+      // Only remove entry from requestQueue_ if all addresses in entry are
+      // processed
+      if (remove) requestQueue_.pop_front();
     } else {
       break;
     }
@@ -336,7 +351,7 @@ void LoadStoreQueue::tick() {
       // This load has completed
       load->execute();
       if (load->isStoreData()) {
-        std::cout << "\tinto str data handle" << std::endl;
+        // std::cout << "\tinto str data handle" << std::endl;
         supplyStoreData(load);
       }
       completedLoads_.push(load);
