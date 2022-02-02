@@ -94,6 +94,8 @@ class LoadStoreQueue {
    * memory order violation. */
   std::shared_ptr<Instruction> getViolatingLoad() const;
 
+  uint64_t getReorderingFlushes() const;
+
  private:
   /** The load queue: holds in-flight load instructions. */
   std::deque<std::shared_ptr<Instruction>> loadQueue_;
@@ -161,6 +163,8 @@ class LoadStoreQueue {
 
   /** The number of loads and stores permitted per cycle. */
   std::vector<uint8_t> reqLimits_;
+
+  uint64_t reorderingFlushes_ = 0;
 };
 
 }  // namespace pipeline

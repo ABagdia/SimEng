@@ -111,7 +111,7 @@ Core::Core(MemoryInterface& instructionMemory, MemoryInterface& dataMemory,
 };
 
 void Core::tick() {
-  // std::cout << "-----------------------" << std::endl;
+  // std::cout << "--------------------------" << std::endl;
   ticks_++;
 
   applyStateChange(isa_.getUpdateState());
@@ -424,7 +424,9 @@ std::map<std::string, std::string> Core::getStats() const {
           {"issue.portBusyStalls", std::to_string(portBusyStalls)},
           {"branch.executed", std::to_string(totalBranchesExecuted)},
           {"branch.mispredict", std::to_string(totalBranchMispredicts)},
-          {"branch.missrate", branchMissRateStr.str()}};
+          {"branch.missrate", branchMissRateStr.str()},
+          {"lsq.reorderFlush",
+           std::to_string(loadStoreQueue_.getReorderingFlushes())}};
 }
 
 }  // namespace outoforder

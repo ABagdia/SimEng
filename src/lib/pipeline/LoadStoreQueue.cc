@@ -209,6 +209,7 @@ bool LoadStoreQueue::commitStore(const std::shared_ptr<Instruction>& uop) {
           // Check for overlapping requests, and flush if discovered
           if (requestsOverlap(storeReq, loadReq)) {
             violatingLoad_ = load.second;
+            reorderingFlushes_++;
           }
         }
       }
@@ -289,35 +290,53 @@ void LoadStoreQueue::tick() {
     uint8_t isWrite = 0;
     auto& entry = requestQueue_.front();
     if (entry.readyAt <= tickCounter_) {
+      // std::cout << "--------" << std::endl;
       if (!entry.insn->isLoad()) {
         isWrite = 1;
-      }
-      // Ensure the limit on the number of permitted operations is adhered to
-      reqCounts[isWrite]++;
-      if (reqCounts[isWrite] > reqLimits_[isWrite] ||
-          reqCounts[isWrite] + reqCounts[!isWrite] > totalLimit_) {
-        break;
       }
       // Deal with requests from queue of addresses in requestQueue_ entry
       auto& addressQueue = entry.reqAddresses;
       while (addressQueue.size()) {
         const simeng::MemoryAccessTarget req = addressQueue.front();
+
+        // if (reqCounts[1] || (reqCounts[0] && isWrite)) {
+        // std::cout << "\tHalting LSQ req, store cannot occur (reads: "
+        //           << unsigned(reqCounts[0])
+        //           << ", writes: " << unsigned(reqCounts[1]) << ")"
+        //           << std::endl;
+        //   remove = false;
+        //   break;
+        // }
+
+        // Ensure the limit on the number of permitted operations is adhered to
+        reqCounts[isWrite]++;
+        if (reqCounts[isWrite] > reqLimits_[isWrite] ||
+            reqCounts[isWrite] + reqCounts[!isWrite] > totalLimit_) {
+          // std::cout
+          //     << "\tHalting LSQ req, too many requests this cycle (reads: "
+          //     << unsigned(reqCounts[0])
+          //     << ", writes: " << unsigned(reqCounts[1]) << ")" << std::endl;
+          remove = false;
+          break;
+        }
+
         // Ensure the limit on the data transfered per cycle is adhered to
         assert(req.size < L1Bandwidth_ &&
                "Individual memory request from LoadStoreQueue exceeds L1 "
                "bandwidth set and thus will never be submitted");
         dataTransfered += req.size;
-        if (dataTransfered >= L1Bandwidth_) {
+        if (dataTransfered > L1Bandwidth_) {
+          // std::cout << "\tHalting LSQ req, exceeded bandwidth this cycle ("
+          //           << dataTransfered << ")" << std::endl;
           remove = false;
           break;
         }
         // Request a read from the memory interface if the requestQueue_ entry
         // represents a read
-        // std::cout << "req: " << entry.insn->getSequenceId() << ":"
-        //           << entry.insn->getInstructionId() << ":0x" << std::hex
-        //           << entry.insn->getInstructionAddress() << std::dec << ":"
-        //           << entry.insn->getMicroOpIndex() << ":0x" << std::hex
-        //           << req.address << std::dec << std::endl;
+        // std::cout << "LSQ REQ: 0x" << std::hex
+        //           << entry.insn->getInstructionAddress() << std::dec
+        //           << " accessing 0x" << std::hex << req.address << std::dec
+        //           << std::endl;
         if (!isWrite) {
           memory_.requestRead(req, entry.insn->getSequenceId());
         }
@@ -325,7 +344,10 @@ void LoadStoreQueue::tick() {
       }
       // Only remove entry from requestQueue_ if all addresses in entry are
       // processed
-      if (remove) requestQueue_.pop_front();
+      if (remove)
+        requestQueue_.pop_front();
+      else
+        break;
     } else {
       break;
     }
@@ -365,6 +387,8 @@ void LoadStoreQueue::tick() {
     const auto& insn = completedLoads_.front();
 
     // Forward the results
+    // std::cout << "Forwarding operands from load 0x" << std::hex
+    //           << insn->getInstructionAddress() << std::dec << std::endl;
     forwardOperands_(insn->getDestinationRegisters(), insn->getResults());
 
     completionSlots_[count].getTailSlots()[0] = std::move(insn);
@@ -380,6 +404,10 @@ std::shared_ptr<Instruction> LoadStoreQueue::getViolatingLoad() const {
 }
 
 bool LoadStoreQueue::isCombined() const { return combined_; }
+
+uint64_t LoadStoreQueue::getReorderingFlushes() const {
+  return reorderingFlushes_;
+}
 
 }  // namespace pipeline
 }  // namespace simeng
